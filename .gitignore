@@ -1,0 +1,15 @@
+build/
+build*/
+_deps/
+out/
+*.zip
+.DS_Store
+.env
+.env.*
+*.pem
+*.p12
+*.pfx
+*.key
+*.cer
+*.mobileprovision
+Icon

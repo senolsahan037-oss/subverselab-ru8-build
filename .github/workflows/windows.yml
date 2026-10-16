@@ -1,0 +1,100 @@
+name: Windows
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: windows-x64 (RU-8)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache JUCE FetchContent
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-juce-9.0.1-ru8
+
+      - name: Configure (Release, x64)
+        run: cmake -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Standalone + VST3 + test tools
+        run: cmake --build build --config Release --target RU8_Standalone RU8_VST3 plugin_check ui_snapshot rt_check --parallel
+
+      - name: Build p2_check (plain C++)
+        run: |
+          cmake -S ci/p2_check -B build-p2 -A x64
+          cmake --build build-p2 --config Release
+
+      - name: List artefacts
+        shell: bash
+        run: |
+          ls -la build/RU8_artefacts/Release/Standalone
+          find build/RU8_artefacts/Release/VST3 -maxdepth 4 | head -40
+
+      # Every test runs even if an earlier one fails; the logs are uploaded; the job fails at the end if any test failed.
+      - name: p2_check
+        id: p2
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p logs
+          set -o pipefail
+          ./build-p2/Release/p2_check.exe 2>&1 | tee logs/p2_check.txt
+
+      - name: plugin_check
+        id: pc
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          ./build/plugin_check_artefacts/Release/plugin_check.exe 2>&1 | tee logs/plugin_check.txt
+
+      - name: rt_check
+        id: rt
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          ./build/rt_check_artefacts/Release/rt_check.exe 2>&1 | tee logs/rt_check.txt
+
+      - name: ui_snapshot (checks + panel PNGs)
+        id: ui
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          ./build/ui_snapshot_artefacts/Release/ui_snapshot.exe ui-windows 2>&1 | tee logs/ui_snapshot.txt
+
+      - name: Zip Standalone + VST3
+        shell: bash
+        run: |
+          cd build/RU8_artefacts/Release
+          7z a -r "$GITHUB_WORKSPACE/RU-8-windows-x64.zip" "VST3/RU-8.vst3" "Standalone/RU-8.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RU-8-windows-x64
+          path: RU-8-windows-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RU-8-windows-test-logs
+          path: logs/
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: RU-8-windows-panel
+          path: ui-windows/
+
+      - name: Fail if any test failed
+        if: steps.p2.outcome != 'success' || steps.pc.outcome != 'success' || steps.rt.outcome != 'success' || steps.ui.outcome != 'success'
+        shell: bash
+        run: |
+          echo "p2_check=${{ steps.p2.outcome }} plugin_check=${{ steps.pc.outcome }} rt_check=${{ steps.rt.outcome }} ui_snapshot=${{ steps.ui.outcome }}"
+          exit 1
