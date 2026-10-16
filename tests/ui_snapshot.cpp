@@ -25,6 +25,7 @@
 #include "../Source/PluginProcessor.h"
 #include "../Source/PluginEditor.h"
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 #include <cstdlib>
 #if defined (__APPLE__)
@@ -1169,5 +1170,11 @@ int main (int argc, char** argv)
     std::printf ("waits for the processor's timer: %d, longest %.1f ms, timed out (5 s) %d\n", gSettles, gSettleWorstMs, gSettleTimeouts);
     std::printf ("ui_snapshot: %d of %d checks passed\n", gPass, gPass + gFail);
     std::fflush (stdout);   // a pipe on Windows is fully buffered: the summary must be out before the shutdown below
+   #if defined (_WIN32)
+    // On the headless Windows runner this console tool never finishes its own shutdown after main returns (CI, 16-17 Oct:
+    // every scene closed, summary printed, then hung until the 15 min limit). RU-8.exe itself closes cleanly (CI step
+    // "Standalone opens and closes") and pluginval loads and unloads the VST3; so the tool leaves once its results are out.
+    std::_Exit (gFail == 0 ? 0 : 1);
+   #endif
     return gFail == 0 ? 0 : 1;
 }
