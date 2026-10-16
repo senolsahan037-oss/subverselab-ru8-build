@@ -63,18 +63,21 @@ jobs:
       - name: ui_snapshot (checks + panel PNGs)
         id: ui
         continue-on-error: true
+        timeout-minutes: 15   # hung for 4+ h on the headless runner (16 Oct); never block the binaries
         shell: bash
         run: |
           set -o pipefail
           ./build/ui_snapshot_artefacts/Release/ui_snapshot.exe ui-windows 2>&1 | tee logs/ui_snapshot.txt
 
       - name: Zip Standalone + VST3
+        if: always()
         shell: bash
         run: |
           cd build/RU8_artefacts/Release
           7z a -r "$GITHUB_WORKSPACE/RU-8-windows-x64.zip" "VST3/RU-8.vst3" "Standalone/RU-8.exe"
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: RU-8-windows-x64
           path: RU-8-windows-x64.zip
