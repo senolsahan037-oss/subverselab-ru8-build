@@ -1164,8 +1164,10 @@ int main (int argc, char** argv)
     checkKeys();
     checkMisc();
     checkPresets();
+    std::printf ("ui_snapshot: every scene is closed (editors and processors destroyed)\n");
 
     std::printf ("waits for the processor's timer: %d, longest %.1f ms, timed out (5 s) %d\n", gSettles, gSettleWorstMs, gSettleTimeouts);
     std::printf ("ui_snapshot: %d of %d checks passed\n", gPass, gPass + gFail);
+    std::fflush (stdout);   // a pipe on Windows is fully buffered: the summary must be out before the shutdown below
     return gFail == 0 ? 0 : 1;
 }

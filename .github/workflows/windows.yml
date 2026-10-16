@@ -69,6 +69,20 @@ jobs:
           set -o pipefail
           ./build/ui_snapshot_artefacts/Release/ui_snapshot.exe ui-windows 2>&1 | tee logs/ui_snapshot.txt
 
+      - name: Standalone opens and closes (RU-8.exe started, asked to close like the window's close button)
+        id: sa
+        continue-on-error: true
+        timeout-minutes: 3
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "build/RU8_artefacts/Release/Standalone/RU-8.exe" -PassThru
+          Start-Sleep -Seconds 15
+          if ($p.HasExited) { "FAIL: exited by itself after start, code $($p.ExitCode)" | Tee-Object logs/standalone.txt; exit 1 }
+          "running after 15 s, window: '$($p.MainWindowTitle)'" | Tee-Object logs/standalone.txt
+          $null = $p.CloseMainWindow()
+          if ($p.WaitForExit(20000)) { "PASS: closed in time, exit code $($p.ExitCode)" | Tee-Object -Append logs/standalone.txt }
+          else { "FAIL: still running 20 s after close" | Tee-Object -Append logs/standalone.txt; Stop-Process -Id $p.Id -Force; exit 1 }
+
       - name: Zip Standalone + VST3
         if: always()
         shell: bash
@@ -96,8 +110,8 @@ jobs:
           path: ui-windows/
 
       - name: Fail if any test failed
-        if: steps.p2.outcome != 'success' || steps.pc.outcome != 'success' || steps.rt.outcome != 'success' || steps.ui.outcome != 'success'
+        if: steps.p2.outcome != 'success' || steps.pc.outcome != 'success' || steps.rt.outcome != 'success' || steps.ui.outcome != 'success' || steps.sa.outcome != 'success'
         shell: bash
         run: |
-          echo "p2_check=${{ steps.p2.outcome }} plugin_check=${{ steps.pc.outcome }} rt_check=${{ steps.rt.outcome }} ui_snapshot=${{ steps.ui.outcome }}"
+          echo "p2_check=${{ steps.p2.outcome }} plugin_check=${{ steps.pc.outcome }} rt_check=${{ steps.rt.outcome }} ui_snapshot=${{ steps.ui.outcome }} standalone=${{ steps.sa.outcome }}"
           exit 1
