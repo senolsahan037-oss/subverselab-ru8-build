@@ -845,7 +845,10 @@ void checkMisc()
         RU8AudioProcessor b;
         b.setStateInformation (state.getData(), (int) state.getSize());
         std::unique_ptr<juce::AudioProcessorEditor> ed (b.createEditor());
-        check (b.mood == "pink" && ed->getWidth() == 1300 && std::abs ((float) ed->getHeight() / (float) ed->getWidth() - (float) kH / (float) kW) < 0.002f,
+        // a display smaller than 1300 (the CI runner's) caps the width at its own limit
+        const auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();
+        const int expectW = juce::jmin (1300, RU8Editor::maxWidthFor (display != nullptr ? display->userArea : juce::Rectangle<int>()));
+        check (b.mood == "pink" && ed->getWidth() == expectW && std::abs ((float) ed->getHeight() / (float) ed->getWidth() - (float) kH / (float) kW) < 0.002f,
                "state: the mood (" + b.mood + ") and the width (" + juce::String (ed->getWidth()) + " x " + juce::String (ed->getHeight()) + ") come back, aspect kept");
         // a width saved on a larger display comes back no larger than this display allows
         RU8AudioProcessor c2;
